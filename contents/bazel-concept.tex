@@ -27,15 +27,23 @@
 
 \subsubsection{隔离环境}
 
-工作区为项目构建提供了一个安全的隔离环境。例如，本地存在两个待构建的\cpp{}项目\ascii{A}和\ascii{B}，它们都依赖于第三方\cpp{}库\ascii{D}。不幸的是，它们分别依赖了不同的版本实现\ascii{v1}和\ascii{v2}。
-
-问题变得非常棘手，系统目录\ascii{/usr/local/include, /usr/local/lib}应该放哪个版本呢？归功于\ascii{Bazel}良好的隔离性，每个项目的工作区都是独立的，它们将所有依赖控制在各自的工作区，避免了第三方库的名字和版本冲突。如\refig{bazel-concept-conflict}所示。
+工作区为项目构建提供了一个安全的隔离环境。例如，本地存在两个待构建的\cpp{}项目\ascii{A}和\ascii{B}，它们都依赖于第三方\cpp{}库\ascii{D}。不幸的是，它们分别依赖了不同的版本实现\ascii{v1}和\ascii{v2}。如\refig{bazel-concept-conflict}所示，问题变得非常棘手，系统目录\ascii{/usr/local/include, /usr/local/lib}应该放\ascii{D}的哪个版本呢？
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.6\textwidth]{figures/bazel-concept-polyflow.png}
+\includegraphics[width=0.5\textwidth]{figures/bazel-concept-conflict.png}
 \caption{工作区：隔离构建环境}
  \label{fig:bazel-concept-conflict}
+\end{figure}
+
+
+归功于\ascii{Bazel}良好的隔离性，每个项目的工作区都是独立的，它们将所有依赖控制在各自的工作区，避免了第三方库的名字和版本冲突。如\refig{bazel-concept-workspace}所示。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.5\textwidth]{figures/bazel-concept-workspace.png}
+\caption{工作区：隔离构建环境}
+ \label{fig:bazel-concept-workspace}
 \end{figure}
 
 \subsubsection{惯例优于配置}
@@ -53,9 +61,9 @@
 
 含有\ascii{BUILD}或\ascii{BUILD.bazel}文件的目录，\ascii{Bazel}在构建时将其标识为\emph{包}(\ascii{Package})。如果一个目录不包含\ascii{BUILD}或\ascii{BUILD.bazel}文件，则它只是一个纯粹的目录，隶属于最近的父包(\ascii{BUILD}或\ascii{BUILD.bazel}文件)。
 
-\subsubsection{命名}
+\subsubsection{包名}
 
-包名始于\ascii{WORKSPACE}所在的目录，由路径名组成。例如\ascii{app/core, app/core/mem}\footnote{注意，\ascii{Unix}路径名\ascii{./app/core}与包名\ascii{app/core}不等价，它们之间存在微妙的差异。}。特殊地(常见于遗留系统中)，如果\ascii{BUILD}文件与\ascii{WORKSPACE}都在根目录中，则此时\ascii{BUILD}文件所在的包名为空，而不是一个\ascii{.}(点号，在\ascii{Unix}中表示当前目录)，如\refig{bazel-concept-nil-package}所示。
+包名始于\ascii{WORKSPACE}所在的目录，由路径名组成。例如\ascii{app/core, app/core/mem}\footnote{注意，\ascii{Unix}路径名\ascii{./app/core}与包名\ascii{app/core}不等价，它们之间存在微妙的差异。}。特殊地(常见于遗留系统中)，如果\ascii{BUILD}文件与\ascii{WORKSPACE}都在根目录中，此时包名为空，而不是一个点号\footnote{在\ascii{Unix}中，点号表示当前目录。}，如\refig{bazel-concept-nil-package}所示。
 
 \begin{figure}[H]
 \centering
@@ -68,7 +76,16 @@
 
 在一个包中，递归地包含该目录下的所有文件。但是，如果某个子目录自身包含\ascii{BUILD}文件，则独立成为一个子包，并不隶属于上一级的父包。也就是说，子包独立于父包，父包不包括子包。
 
-如\refig{bazel-concept-polyflow}所示，包\ascii{app/core}不包括包\ascii{app/core/mem}，它们相互独立。但是，习惯依然称\ascii{app/core/mem}为\ascii{app/core}的子包。
+如\refig{bazel-concept-subpackage}所示，包\ascii{app/core}不包括包\ascii{app/core/mem}，它们相互独立。但是，习惯依然称\ascii{app/core/mem}为\ascii{app/core}的子包。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.4\textwidth]{figures/bazel-concept-subpackage.png}
+\caption{子包}
+ \label{fig:bazel-concept-subpackage}
+\end{figure}
+
+
 
 \subsection{目标(Target)}
 
@@ -80,7 +97,11 @@
 
 \subsubsection{规则}
 
-在\ascii{BUILD}文件中，可以定义零个或多个\emph{规则}(\ascii{Rule})。规则由输入、输出、动作三元祖构成，通过规则之间的依赖关系，构建了构建运行时的\ascii{DAG}图。一般地，依赖关系具有多种表现形式，而且与编程语言极其相关。例如，在编译时，\ascii{A}依赖于\ascii{B}的头文件；在链接时，\ascii{A}依赖于\ascii{B}的符号；在运行时，\ascii{A}依赖于\ascii{B}的数据。
+在\ascii{BUILD}文件中，可以定义零个或多个\emph{规则}(\ascii{Rule})。规则由输入、输出、动作三元祖构成。因为\ascii{Bazel}使用声明式的表达方式，规则的动作往往是隐式的。例如，使用规则\ascii{cc\_library}时，无需显式地实现\ascii{g++ a.cc -o a.o}。
+
+规则输入的文件，可能是源文件，也可以是其他规则生成的派生文件，常通过\ascii{srcs, hdrs}等属性表示。但是，规则输出的文件，必然是派生文件。此外，规则输出的派生文件，必然与该规则属于同一个包；但是，规则输入的源文件可以来自于其他包。
+
+规则的输入也可以是规则，常通过\ascii{deps}属性表示。通过规则之间的依赖关系，构建了运行时的\ascii{DAG}图。一般地，依赖关系具有多种表现形式，而且与编程语言极其相关。例如，在编译时，\ascii{A}依赖于\ascii{B}的头文件；在链接时，\ascii{A}依赖于\ascii{B}的符号；在运行时，\ascii{A}依赖于\ascii{B}的数据。
 
 \subsubsection{包集合}
 
@@ -207,6 +228,15 @@ http_archive(
 $ curl -L https://github.com/horance-liu/cut/archive/master.tar.gz | sha256sum
  \end{python}
 \end{nodiff}
+
+\ascii{Cub}依赖于第三方库\ascii{Cut}的关系，如\refig{bazel-concept-cub-deps-cut}所示。
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{figures/bazel-concept-cub-deps-cut.png}
+\caption{Cub引用外部依赖Cut}
+ \label{fig:bazel-concept-cub-deps-cut}
+\end{figure}
 
 \subsection{遗留系统}
 
