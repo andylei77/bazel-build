@@ -290,10 +290,42 @@ cc_library(
 
 执行如下命令，启动构建\ascii{Cut}。注意，\ascii{BUILD}文件与\ascii{WORKSPACE}在同一目录，标签\ascii{//:cut\_main}的包名为空。
 
-\begin{nodiff}{构建GoogleTest}
+\begin{nodiff}{构建Cut}
  \begin{python}
+$ bazel build //:cut
 $ bazel build //:cut_main
  \end{python}
 \end{nodiff}
+
+\end{content}
+
+\section{评估模型}
+
+\begin{content}
+
+\subsection{三阶段}
+
+\ascii{Bazel}的构建过程分为三个阶段，如\refig{bazel-concept-eval-model}。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/bazel-domain-model.png}
+\caption{GoogleTest}
+ \label{fig:bazel-concept-eval-model}
+\end{figure}
+
+\subsubsection{加载}
+
+在加载阶段，加载并评估本次构建所需的所有扩展和\ascii{BUILD}文件。执行\ascii{BUILD}文件会自动实例化其所包含的所有规则，并将其添加到规则的依赖图中。另外，在加载阶段，宏也会被自动评估。
+
+\subsubsection{分析}
+
+在分析阶段，将自动执行规则的实现代码，即调用实现规则的函数，并自动实例化相应的动作(\ascii{Action})。动作描述了规则从输入自动生成输出的步骤。例如，\ascii{gcc hello.c - o hello.o}。
+
+需要注意的是，在执行实际命令之前，必须明确列出规则的派生文件列表。也就是说，分析阶段以加载阶段生成的依赖图为输入，自动生成动作图(\ascii{Action Graph})。
+
+\subsubsection{执行}
+
+在执行阶段，当至少需要一个输出时，将自动执行相应的操作序列。如果文件丢失或命令未能生成相应的输出，则执行失败。另外，测试也在执行阶段自动运行。
 
 \end{content}
